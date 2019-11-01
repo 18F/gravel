@@ -112,7 +112,7 @@ func (ca *CertificateAuthority) makeRootCert(
 	serial := makeSerial()
 	template := &x509.Certificate{
 		Subject: pkix.Name{
-			CommonName: subjCNPrefix + hex.EncodeToString(serial.Bytes()[:3]),
+			CommonName:         subjCNPrefix + hex.EncodeToString(serial.Bytes()[:3]),
 			Organization:       []string{"18F"},
 			OrganizationalUnit: []string{"cloud.gov"},
 			Country:            []string{"US"},
@@ -127,6 +127,7 @@ func (ca *CertificateAuthority) makeRootCert(
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+		DNSNames: []string{"localhost"},
 	}
 
 	var signerKey crypto.Signer
