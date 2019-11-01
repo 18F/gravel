@@ -1,5 +1,5 @@
 jobs:
-  build:
+  build-ubuntu-1804:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -11,4 +11,75 @@ jobs:
         uses: actions/setup-go@v1
         with:
           go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v ./...
+  build-ubuntu-1604:
+    runs-on: ubuntu-16.04
+    strategy:
+      matrix:
+        go: [ '1.11.x', '1.12.x', '1.13.x' ]
+    name: go${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v ./...
+  build-ubuntu-latest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.11.x', '1.12.x', '1.13.x' ]
+    name: go${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v ./...
+  build-macos-1014:
+    runs-on: macos-10.14
+    strategy:
+      matrix:
+        go: [ '1.11.x', '1.12.x', '1.13.x' ]
+    name: go${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v ./...
+  build-macos-latest:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        go: [ '1.11.x', '1.12.x', '1.13.x' ]
+    name: go${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
+      - run: go test -v ./...
+  build-windows-latest:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        go: [ '1.11.x', '1.12.x', '1.13.x' ]
+    name: go${{ matrix.go }} test
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go build -v ./...
       - run: go test -v ./...
