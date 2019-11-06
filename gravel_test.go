@@ -69,8 +69,9 @@ func TestGravelStartDnsServer(t *testing.T) {
 	_, err = net.Dial("udp", fmt.Sprintf("127.0.0.1:%d", opts.DnsOpts.DnsPort))
 	at.Nil(err, "there should be not connection errors because the server is started")
 
-	g.DnsServer.Stopper <- struct{}{}
-	time.Sleep(3 * time.Second)
+	if err := g.DnsServer.Server.Shutdown(); err != nil {
+		at.NoError(err, "there must not be an error shutting down the dns server")
+	}
 }
 
 func TestGravelStartWebServer(t *testing.T) {
@@ -150,6 +151,69 @@ func TestGravelWithDNSCertificate(t *testing.T) {
 
 	request := certificate.ObtainRequest{
 		Domains: []string{"test.service"},
+		Bundle:  true,
+	}
+
+	certificates, err := client.Certificate.Obtain(request)
+	at.Nil(err, "there should be no error obtaining a certificate")
+
+	at.NotEmpty(certificates, "certificates should not be empty")
+
+	at.EqualValues("test.service", certificates.Domain, "certificate domain should match")
+
+	if err := g.DnsServer.Server.Shutdown(); err != nil {
+		at.NoError(err, "there should not be an error shutting down the dns server")
+	}
+
+	if err := g.CertificateServer.Shutdown(context.TODO()); err != nil {
+		at.NoError(err, "there should not be an error shutting down the dns server")
+	}
+}
+
+func TestGravelWithMultipleDNSCertificates(t *testing.T) {
+	at := assert.New(t)
+
+	opts := NewDefaultGravelOpts()
+	opts.VAOpts.CustomResolverAddress = fmt.Sprintf("localhost:%d", opts.DnsOpts.DnsPort)
+	g, err := New(opts)
+	at.Nil(err, "there should not be an error on instantiation")
+
+	// start the servers.
+	go g.StartDnsServer()
+	go g.StartWebServer()
+	time.Sleep(3 * time.Second)
+
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	at.Nil(err, "there should be no error when generating a certificate")
+
+	tu := TestUser{
+		Email: "test@test.com",
+		key:   privateKey,
+	}
+
+	config := lego.NewConfig(&tu)
+	config.HTTPClient = g.Client
+	config.Certificate.KeyType = certcrypto.RSA2048
+	config.CADirURL = fmt.Sprintf("https://%s%s", g.Opts.ListenAddress, g.Opts.WfeOpts.DirectoryPath)
+
+	client, err := lego.NewClient(config)
+	at.Nil(err, "there should not be an error when instantiating a new let's encrypt client")
+
+	err = client.Challenge.SetDNS01Provider(
+		g.Opts.DnsOpts.Provider,
+		dns01.AddRecursiveNameservers([]string{
+			fmt.Sprintf("127.0.0.1:%d", g.Opts.DnsOpts.DnsPort),
+		}),
+		dns01.WrapPreCheck(g.DnsServer.PreCheck))
+	at.Nil(err, "client dns challenge configuration should be nil")
+
+	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	at.Nil(err, "there should be no registration errors")
+
+	tu.Registration = reg
+
+	request := certificate.ObtainRequest{
+		Domains: []string{"test.service", "test2.service", "test3.service"},
 		Bundle:  true,
 	}
 
