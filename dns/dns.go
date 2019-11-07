@@ -51,6 +51,9 @@ type IntegrationServerOpts struct {
 	// verification.
 	AutoUpdateAuthZRecords bool
 
+	// Set to false if records being added to the server are already encrypted. Defaults to false.
+	AlreadyHashed bool
+
 	// The records handler so the DNS server can interact update records.
 	RecordHandler chan DnsMessage
 
@@ -80,6 +83,7 @@ func NewDefaultIntegrationServerOpts() *IntegrationServerOpts {
 		DnsPort:                5454,
 		Logger:                 logrus.New(),
 		Provider:               NewDnsProvider(rh),
+		AlreadyHashed:          false,
 	}
 }
 
@@ -168,8 +172,13 @@ func (is *IntegrationServer) handleRecords() {
 			if is.Opts.AutoUpdateAuthZRecords {
 				is.mu.Lock()
 
-				keyAuthShaBytes := sha256.Sum256([]byte(msg.KeyAuth))
-				value := base64.RawURLEncoding.EncodeToString(keyAuthShaBytes[:sha256.Size])
+				var value string
+				if !is.Opts.AlreadyHashed {
+					keyAuthShaBytes := sha256.Sum256([]byte(msg.KeyAuth))
+					value = base64.RawURLEncoding.EncodeToString(keyAuthShaBytes[:sha256.Size])
+				} else {
+					value = msg.KeyAuth
+				}
 
 				is.TestRecords["_acme-challenge."+msg.Domain+"."] = value
 				is.mu.Unlock()
