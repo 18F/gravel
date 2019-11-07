@@ -23,7 +23,8 @@ func TestNewDefaultIntegrationServerOpts(t *testing.T) {
 		BaseDomain:             "service",
 		DnsPort:                5454,
 		Logger:                 logrus.New(),
-		Provider: NewDnsProvider(trh),
+		Provider:               NewDnsProvider(trh),
+		AlreadyHashed:          false,
 	}
 
 	actual := NewDefaultIntegrationServerOpts()
