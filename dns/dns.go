@@ -20,8 +20,10 @@ type IntegrationServer struct {
 	// RecordsHandler that can be queried against.
 	TestRecords map[string]string
 
-	// Channel for receiving records. This is exported so it can be used as a pipeline for inspecting records as they
-	// traverse from Gravel to the integration DNS.
+	// Records received and available for downstream processing.
+	Records []DnsMessage
+
+	// Channel for receiving records. Mostly used for internal purposes.
 	RecordsHandler chan DnsMessage
 
 	// Options on how the DNS instance is running.
@@ -87,6 +89,7 @@ func NewIntegrationServer(opts *IntegrationServerOpts) *IntegrationServer {
 
 	is.Opts = opts
 	is.RecordsHandler = opts.RecordHandler
+	is.Records = make([]DnsMessage, 0)
 	is.TestRecords = make(map[string]string)
 	if is.Opts.DnsPort == 0 {
 		is.Opts.DnsPort = 54
@@ -161,6 +164,7 @@ func (is *IntegrationServer) handleRecords() {
 	for {
 		select {
 		case msg := <-is.RecordsHandler:
+			is.Records = append(is.Records, msg)
 			if is.Opts.AutoUpdateAuthZRecords {
 				is.mu.Lock()
 
