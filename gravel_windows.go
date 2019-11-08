@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/18f/gravel/ca"
 	"github.com/18f/gravel/db"
@@ -147,17 +149,42 @@ func New(opts *GravelOpts) (*Gravel, error) {
 		return &Gravel{}, err
 	}
 
-	// generate our http client transport using the root certificates from the gravel certificate authority.
-	certPool, err := x509.SystemCertPool()
+	// we have to catch if this is on windows due to https://github.com/golang/go/issues/16736
+	certPool := x509.NewCertPool()
+
+	var certs []*x509.Certificate
+	var cert *syscall.CertContext
+	storeHandle, err := syscall.CertOpenSystemStore(0, syscall.StringToUTF16Ptr("Root"))
 	if err != nil {
-		return &Gravel{}, err
+		fmt.Println(syscall.GetLastError())
 	}
-	if ok := certPool.AppendCertsFromPEM(rootPublicKey); !ok {
-		g.t.Log("no gravel certs appended, only using system certificates")
+	for {
+		cert, err = syscall.CertEnumCertificatesInStore(storeHandle, cert)
+		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok {
+				// CRYPT_E_NOT_FOUND
+				if errno == 0x80092004 {
+					break
+				}
+			}
+			fmt.Println(syscall.GetLastError())
+		}
+		if cert == nil {
+			break
+		}
+		// Copy the buf, since ParseCertificate does not create its own copy.
+		buf := (*[1 << 20]byte)(unsafe.Pointer(cert.EncodedCert))[:]
+		buf2 := make([]byte, cert.Length)
+		copy(buf2, buf)
+		if c, err := x509.ParseCertificate(buf2); err == nil {
+			certs = append(certs, c)
+		}
 	}
-	g.clientTlsConfig = &tls.Config{
-		InsecureSkipVerify: true,
-		RootCAs:            certPool,
+
+	if len(certs) > 0 {
+		for cert := range certs {
+			certPool.AddCert(certs[cert])
+		}
 	}
 
 	if ok := certPool.AppendCertsFromPEM(rootPublicKey); !ok {
